@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Line Distribution Maker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&family=Roboto+Mono:wght@700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * { box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
+        
+        body { margin: 0; background-color: #2c2f33; color: #fff; overflow: hidden; height: 100vh; width: 100vw; }
+        #app { position: relative; height: 100vh; width: 100vw; overflow: hidden; display: flex; flex-direction: column; }
+
+        .btn-toggle-panel {
+            position: absolute; top: 12px; left: 12px; z-index: 250;
+            background: #111; color: #fff; border: 1px solid #444; padding: 6px 12px;
+            font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer;
+        }
+        .input-panel {
+            position: absolute; top: 0; left: 0; height: 100%; width: 340px; 
+            background-color: rgba(20, 20, 20, 0.98); padding: 50px 15px 20px 15px;
+            display: flex; flex-direction: column; gap: 12px; border-right: 1px solid #444;
+            overflow-y: auto; z-index: 150; transition: transform 0.3s ease; transform: translateX(-360px);
+        }
+        .input-panel.open { transform: translateX(0); }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold; }
+        .form-group input[type="number"], .form-group input[type="text"] { padding: 7px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px; }
+        .btn-clear-data { background: #ff4757; color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-add-member { padding: 8px; background: #82A0D8; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 4px; }
+        hr { border: none; border-top: 1px solid #444; margin: 2px 0; width: 100%; }
+        
+        .group-table { width: 100%; font-size: 10px; border-collapse: collapse; margin-top: 5px; color: #fff; }
+        .group-table th, .group-table td { border: 1px solid #555; padding: 4px; text-align: center; }
+        .group-table th { background: #333; }
+
+        .video-stage { 
+            position: relative; flex-grow: 1; width: 100vw; 
+            display: flex; flex-direction: column; justify-content: flex-end; 
+            padding: 20px 40px; z-index: 100;
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.85)); 
+        }
+
+        .avatar-stage-container {
+            display: flex; justify-content: center; align-items: flex-end; flex-wrap: wrap;
+            width: 100%; max-width: 95%; height: auto; min-height: 90px;
+            margin: 0 auto; gap: 12px; margin-bottom: 20px;
+        }
+
+        .stage-avatar-wrapper {
+            position: relative; width: 76px; height: 76px; border-radius: 50%;
+            background-color: #222; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.5; filter: grayscale(70%); display: flex; align-items: center; justify-content: center; z-index: 1;
+        }
+        .stage-avatar-wrapper.active {
+            transform: scale(1.15) translateY(-8px);
+            opacity: 1; filter: grayscale(0%); z-index: 120;
+        }
+
+        .stage-avatar-img-wrap {
+            width: 82%; height: 82%; border-radius: 50%; overflow: hidden; position: relative; z-index: 2;
+            border: 2px solid transparent; transition: all 0.25s ease;
+        }
+        .stage-avatar-wrapper.active .stage-avatar-img-wrap {
+            border: 2px solid var(--theme-color);
+            box-shadow: 0 0 12px var(--theme-color);
+        }
+        .stage-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+
+        .stage-progress-svg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); z-index: 3; pointer-events: none;
+        }
+        .stage-progress-bg { fill: none; stroke: #444; stroke-width: 4; }
+        .stage-progress-bar {
+            fill: none; stroke: var(--theme-color); stroke-width: 4; stroke-linecap: round;
+            stroke-dasharray: 276.46; stroke-dashoffset: 276.46; transition: stroke-dashoffset 0.1s linear;
+        }
+        
+        .output-list { 
+            position: relative; width: 95vw; margin: 0 auto; height: 250px; 
+        }
+        
+        .member-card {
+            position: absolute; left: 0; height: 32px; width: 100%; 
+            display: flex; align-items: center; gap: 4px; 
+            transition: top 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 1;
+        }
+        .member-card.active { z-index: 110; }
+
+        .card-avatar-floating {
+            position: absolute; right: 10px; bottom: 0px; z-index: 10; pointer-events: none;
+        }
+        .card-avatar-img { 
+            display: block; height: 32px; width: auto; 
+            transform-origin: bottom center; filter: grayscale(100%); 
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+        }
+        .member-card.active .card-avatar-img {
+            filter: grayscale(0%) drop-shadow(0 0 2px var(--theme-color)) drop-shadow(0 0 5px rgba(255,255,255,0.25)); 
+            transform: scale(1.3) translateY(-1px);
+        }
+
+        .percent-capsule {
+            min-width: 70px; height: 100%; background-color: var(--theme-color); 
+            border-radius: 30px 0 0 30px; 
+            display: flex; align-items: center; justify-content: center; padding: 0 10px;
+            font-family: 'Montserrat', sans-serif !important; font-size: 12px; font-weight: 800; color: #ffffff; 
+            flex-shrink: 0; opacity: 0.75; transition: all 0.2s ease;
+        }
+        .member-card.active .percent-capsule { 
+            opacity: 1; font-weight: 900; box-shadow: 0 0 8px rgba(0,0,0,0.3);
+        }
+
+        .finish-check {
+            display: none; align-items: center; justify-content: center;
+            width: 14px; height: 14px; background-color: #fff; border-radius: 50%;
+            margin-right: 5px; flex-shrink: 0; box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+        .finish-check svg { width: 9px; height: 9px; fill: var(--theme-color); }
+
+        .card-separator {
+            width: 9px; height: 100%; background-color: var(--theme-color);
+            border-radius: 5px; flex-shrink: 0; opacity: 0.75; transition: all 0.2s ease;
+        }
+        .member-card.active .card-separator { 
+            opacity: 1; box-shadow: 0 0 8px rgba(0,0,0,0.3);
+        }
+
+        .progress-wrapper {
+            position: relative; flex-grow: 1; height: 100%; background-color: #1a1a1a; 
+            border-radius: 0 30px 30px 0; overflow: hidden;
+        }
+        .progress-bg-default { position: absolute; top:0; left:0; width:100%; height:100%; background-color: #727272; z-index: 0; transition: opacity 0.3s ease; }
+        .progress-bg-active { position: absolute; top:0; left:0; width:100%; height:100%; background-color: var(--theme-color); opacity: 0; z-index: 0; transition: opacity 0.3s ease; }
+        .member-card.active .progress-bg-default { opacity: 0; }
+        .member-card.active .progress-bg-active { opacity: 0.25; }
+
+        .fill-progress-line { 
+            position: absolute; left: 0; top: 0; height: 100%; width: 0%; display: none; 
+            background-color: var(--theme-color); z-index: 2; 
+            border-radius: 0 30px 30px 0; transition: width 0.1s linear; 
+        }
+
+        .card-content-overlay {
+            position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 80px 0 16px; 
+            pointer-events: none; font-size: 14px; font-weight: 900; color: #ffffff; 
+            z-index: 3; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        .name-box { display: flex; gap: 5px; align-items: center; }
+        .en-name { text-transform: uppercase; }
+        .kr-name { font-weight: 700; font-size: 12px; color: #e1e1e1; opacity: 0; visibility: hidden; transition: all 0.2s ease; transform: translateX(-5px); }
+        .member-card.active .kr-name { opacity: 1; visibility: visible; transform: translateX(0); }
+        
+        .role-badge {
+            font-size: 8px; font-weight: 900; background: rgba(0,0,0,0.7); 
+            border: 1px solid; border-radius: 4px;
+            white-space: nowrap; overflow: hidden;
+            opacity: 0; max-width: 0; padding: 0; margin-left: 0; border-width: 0;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .role-badge.show {
+            opacity: 1; max-width: 150px; padding: 2px 6px; border-width: 1px; margin-left: 6px;
+        }
+
+        .time-counter { 
+            display: flex; align-items: center; gap: 1px; font-family: 'Montserrat', sans-serif; 
+            font-size: 13px; font-weight: 800; line-height: 1;
+        }
+
+        .rolling-secs { display: flex; height: 1em; overflow: hidden; }
+        .digit-slot { height: 1em; overflow: hidden; width: 0.65em; position: relative; }
+        .digit-track { display: flex; flex-direction: column; transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .digit-track span { display: block; height: 1em; line-height: 1em; text-align: center; font-family: 'Montserrat', sans-serif !important; }
+
+        .control-deck-bar { 
+            width: 100%; display: flex; flex-direction: column; align-items: center; 
+            padding: 12px 8px; border-top: 1px solid #333; background: #1a1a1a; gap: 8px; z-index: 200;
+        }
+        .group-controllers { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; width: 100%; }
+        .btn-group-node { padding: 5px 10px; background: #333; border: 1px solid #555; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer; color: #ccc; transition: all 0.2s; }
+        .btn-group-node.active { background: #fff; color: #000; border-color: #fff; }
+        
+        .quick-controllers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
+        .node-wrapper { display: flex; flex-direction: column; align-items: center; position: relative; }
+        .btn-node { padding: 8px 14px; background: #333; border: 1px solid #555; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; color: #eee; transition: all 0.2s; user-select: none;}
+        .btn-node.active { background: var(--theme-color); border-color: var(--theme-color); color: #000; font-weight: 900; box-shadow: 0 0 8px var(--theme-color); }
+        
+        .btn-finish-rect { margin-top: 4px; width: 100%; background: #222; color: #888; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: 800; text-align: center; padding: 4px 0; cursor: pointer; user-select: none;}
+        
+        .node-reset-x { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: #ff4757; color: white; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; z-index: 10; }
+
+        .btn-remove-member { background: #ff4757; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; padding: 3px 6px; font-weight: bold; }
+
+        @media (max-width: 600px) {
+            .video-stage { padding: 10px 5px 15px 5px; }
+            .avatar-stage-container { gap: 5px; height: auto; min-height: 60px; margin-bottom: 10px; }
+            .stage-avatar-wrapper { width: 48px; height: 48px; }
+            .stage-avatar-wrapper.active { transform: scale(1.15) translateY(-8px); }
+            
+            .output-list { height: 235px; width: 98vw; }
+            .member-card { height: 28px; gap: 3px; }
+            .percent-capsule { min-width: 60px; font-size: 10px; padding: 0 8px; }
+            .card-separator { width: 6px; border-radius: 3px; } 
+            
+            .card-content-overlay { font-size: 11px; padding: 0 65px 0 10px; } 
+            
+            .kr-name { font-size: 9px; }
+            .time-counter { font-size: 11px; }
+            .card-avatar-img { height: 28px; }
+            .member-card.active .card-avatar-img { transform: scale(1.3); }
+            
+            .role-badge { font-size: 7px; }
+
+            .control-deck-bar { padding: 8px 6px; gap: 6px; }
+            .group-controllers { gap: 3px; }
+            .btn-group-node { padding: 4px 6px; font-size: 9px; border-radius: 4px; }
+            
+            .quick-controllers { gap: 6px 5px; }
+            .node-wrapper { width: calc(33.33% - 4px); }
+            .btn-node { width: 100%; text-align: center; padding: 6px 2px; font-size: 11px; border-radius: 6px; }
+            .btn-finish-rect { font-size: 9px; padding: 2px 0; margin-top: 2px; }
+            .node-reset-x { width: 14px; height: 14px; font-size: 9px; top: -4px; right: -4px; }
+            
+            .input-panel { width: 300px; }
+            .btn-toggle-panel { top: 10px; left: 10px; padding: 5px 10px; font-size: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <button class="btn-toggle-panel" onclick="togglePanel()">⚙ [SETTINGS]</button>
+
+    <div class="input-panel" id="inputPanel">
+        <div class="form-group">
+            <label>[ADD MEMBER]</label>
+            <input type="text" id="new-name" placeholder="[NAME] (e.g. LIZ)">
+            <input type="text" id="new-krname" placeholder="[SUB NAME] (e.g. 리즈)">
+            <input type="text" id="new-role" placeholder="[ROLE] (e.g. MAIN VOCAL)">
+            <div style="display: flex; gap: 4px;">
+                <input type="color" id="new-color" value="#85E6C5" style="padding:0; width:36px; height:31px; border: 1px solid #555; border-radius: 4px; cursor: pointer;">
+                <input type="text" id="new-hotkey" placeholder="[KEY] (e.g. T)" maxlength="1" style="flex:1;">
+                <input type="text" id="new-f-hotkey" placeholder="[FINISH] (e.g. G)" maxlength="1" style="flex:1;">
+            </div>
+            <button class="btn-add-member" onclick="addNewMember()">+ [ADD]</button>
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>[MAX SEC]</label>
+            <input type="number" step="0.1" id="input-maxsec" value="180.0">
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>[AVATAR UPLOAD]</label>
+            <div id="avatar-uploaders-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>[GROUP]</label>
+            <div id="group-matrix-container"></div>
+        </div>
+        <hr>
+        <button class="btn-clear-data" onclick="resetAllTimes()">↺ [RESET ALL TIME]</button>
+    </div>
+
+    <div class="video-stage">
+        <div class="avatar-stage-container" id="avatar-stage-root"></div>
+        <div class="output-list" id="member-list"></div>
+    </div>
+    
+    <div class="control-deck-bar">
+        <div class="group-controllers" id="group-bar"></div>
+        <div class="quick-controllers" id="quick-bar"></div>
+    </div>
+</div>
+
+<script>
+    let members = [];
+    let defaultMembers = [
+        {"id":1,"enName":"GAEUL","krName":"가을","role":"MAIN RAPPER, SUB VOCAL","color":"#90A17D","hotkey":"Q","finishHotkey":"A","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false},
+        {"id":2,"enName":"YUJIN","krName":"유진","role":"LEADER, MAIN VOCAL","color":"#82A0D8","hotkey":"W","finishHotkey":"S","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false},
+        {"id":3,"enName":"REI","krName":"레이","role":"MAIN RAPPER, SUB VOCAL","color":"#ECEE81","hotkey":"E","finishHotkey":"D","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false},
+        {"id":4,"enName":"WONYOUNG","krName":"원영","role":"VOCAL, VISUAL","color":"#EDB7ED","hotkey":"R","finishHotkey":"F","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false},
+        {"id":5,"enName":"LIZ","krName":"리즈","role":"MAIN VOCAL","color":"#85E6C5","hotkey":"T","finishHotkey":"G","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false},
+        {"id":6,"enName":"LEESEO","krName":"이서","role":"SUB VOCAL, MAKNAE","color":"#D5B4B4","hotkey":"Y","finishHotkey":"H","ms":0, "avatar":"", "hasShownRole": false, "isFinished": false}
+    ];
+
+    let groups = { "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [] };
+    let activeMainIds = new Set();
+    let activeGroupIds = new Set();
+    let lastTimestamp = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadData();
+        initUI();
+    });
+
+    function loadData() {
+        if (localStorage.getItem('custom-members-list')) {
+            try { 
+                members = JSON.parse(localStorage.getItem('custom-members-list')); 
+            } catch(e) { console.error(e); members = [...defaultMembers]; }
+        } else {
+            members = JSON.parse(JSON.stringify(defaultMembers)); 
+        }
+
+        if (localStorage.getItem('dist-group-configs-custom')) {
+            try { groups = JSON.parse(localStorage.getItem('dist-group-configs-custom')); } catch(e) { console.error(e); }
+        }
+
+        if (localStorage.getItem('custom-avatar-cache')) {
+            try {
+                let savedAvatars = JSON.parse(localStorage.getItem('custom-avatar-cache'));
+                members.forEach(m => { if(savedAvatars[m.id]) m.avatar = savedAvatars[m.id]; });
+            } catch(e) { console.error(e); }
+        }
+    }
+
+    function saveData() {
+        localStorage.setItem('custom-members-list', JSON.stringify(members));
+        localStorage.setItem('dist-group-configs-custom', JSON.stringify(groups));
+        let cache = {}; members.forEach(x => { cache[x.id] = x.avatar; });
+        localStorage.setItem('custom-avatar-cache', JSON.stringify(cache));
+    }
+
+    function initUI() {
+        document.getElementById('avatar-uploaders-container').innerHTML = '';
+        document.getElementById('group-matrix-container').innerHTML = '';
+        document.getElementById('avatar-stage-root').innerHTML = '';
+        document.getElementById('member-list').innerHTML = '';
+        document.getElementById('group-bar').innerHTML = '';
+        document.getElementById('quick-bar').innerHTML = '';
+
+        buildAvatarUploaders();
+
+        members.forEach((m, index) => { 
+            m.ms = 0; m.hasShownRole = false; m.isFinished = false; 
+            createStageAvatarNode(m);
+            createControlNode(m); 
+            createCardNode(m, index); 
+        });
+
+        const groupBar = document.getElementById('group-bar');
+        for(let i = 1; i <= 9; i++) {
+            const gBtn = document.createElement('div'); 
+            gBtn.className = 'btn-group-node'; gBtn.id = `btn-group-${i}`; 
+            gBtn.innerText = `U${i}`; 
+            gBtn.onclick = () => toggleGroup(i.toString());
+            groupBar.appendChild(gBtn);
+        }
+
+        buildGroupMatrix();
+        updateAllGraphics();
+        checkActiveStates();
+    }
+
+    function addNewMember() {
+        const name = document.getElementById('new-name').value.trim() || 'UNKNOWN';
+        const krname = document.getElementById('new-krname').value.trim();
+        const role = document.getElementById('new-role').value.trim();
+        const color = document.getElementById('new-color').value;
+        const hotkey = document.getElementById('new-hotkey').value.trim().toUpperCase() || '?';
+        const finishHotkey = document.getElementById('new-f-hotkey').value.trim().toUpperCase() || '!';
+
+        const newMem = {
+            id: Date.now(),
+            enName: name,
+            krName: krname,
+            role: role,
+            color: color,
+            hotkey: hotkey,
+            finishHotkey: finishHotkey,
+            ms: 0,
+            avatar: "",
+            hasShownRole: false,
+            isFinished: false
+        };
+
+        members.push(newMem);
+        saveData();
+        
+        document.getElementById('new-name').value = '';
+        document.getElementById('new-krname').value = '';
+        document.getElementById('new-role').value = '';
+        document.getElementById('new-hotkey').value = '';
+        document.getElementById('new-f-hotkey').value = '';
+
+        initUI();
+    }
+
+    function removeMember(id) {
+        if (confirm("Remove this member?")) {
+            members = members.filter(m => m.id !== id);
+            for(let i=1; i<=9; i++) {
+                if(groups[i]) groups[i] = groups[i].filter(mId => mId !== id);
+            }
+            activeMainIds.delete(id);
+            saveData();
+            initUI();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return; 
+        const key = e.key.toUpperCase();
+        if (key >= '1' && key <= '9') { toggleGroup(key); return; }
+        
+        const memberMain = members.find(m => m.hotkey === key);
+        if (memberMain) { 
+            toggleMain(memberMain.id);
+            return;
+        }
+
+        const memberFinish = members.find(m => m.finishHotkey === key);
+        if (memberFinish) { 
+            toggleFinished(memberFinish.id);
+            return;
+        }
+    });
+
+    function togglePanel() { document.getElementById('inputPanel').classList.toggle('open'); }
+
+    function buildAvatarUploaders() {
+        const container = document.getElementById('avatar-uploaders-container');
+        container.innerHTML = members.map(m => `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                <span style="font-size:10px; font-weight:bold; width:65px; color:${m.color}; text-shadow: 1px 1px 1px #000; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${m.enName}</span>
+                <input type="file" accept="image/*" style="font-size:10px; flex-grow:1; width:90px;" onchange="handleLaptopFile(${m.id}, this)">
+                <button class="btn-remove-member" onclick="removeMember(${m.id})">X</button>
+            </div>
+        `).join('');
+    }
+
+    function handleLaptopFile(id, inputElement) {
+        const file = inputElement.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result;
+                let m = members.find(x => x.id === id);
+                if (m) {
+                    m.avatar = base64Data;
+                    const avtImg = document.getElementById(`stage-avt-img-${id}`);
+                    if (avtImg) avtImg.src = base64Data;
+                    
+                    const listAvtImg = document.getElementById(`list-avt-img-${id}`);
+                    if (listAvtImg) listAvtImg.src = base64Data;
+
+                    saveData();
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function buildGroupMatrix() {
+        const matrixContainer = document.getElementById('group-matrix-container');
+        let html = `<table class="group-table"><thead><tr><th>U</th>${members.map(m => `<th>${m.enName.slice(0,3)}</th>`).join('')}</tr></thead><tbody>`;
+        for(let i = 1; i <= 9; i++) {
+            html += `<tr><td><b>${i}</b></td>${members.map(m => {
+                const isChecked = (groups[i] && groups[i].includes(m.id)) ? 'checked' : '';
+                return `<td><input type="checkbox" onchange="updateGroupConfig(${i}, ${m.id}, this.checked)" ${isChecked}></td>`;
+            }).join('')}</tr>`;
+        }
+        matrixContainer.innerHTML = html + `</tbody></table>`;
+    }
+
+    function updateGroupConfig(groupNum, memberId, isChecked) {
+        if (!groups[groupNum]) groups[groupNum] = [];
+        if (isChecked) { 
+            if (!groups[groupNum].includes(memberId)) groups[groupNum].push(memberId); 
+        } else { 
+            groups[groupNum] = groups[groupNum].filter(id => id !== memberId); 
+        }
+        saveData();
+    }
+
+    function createStageAvatarNode(member) {
+        const stageRoot = document.getElementById('avatar-stage-root');
+        const wrapper = document.createElement('div');
+        wrapper.id = `stage-avt-${member.id}`;
+        wrapper.className = 'stage-avatar-wrapper';
+        wrapper.style.setProperty('--theme-color', member.color);
+        
+        const avtSrc = member.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23eee'/%3E%3C/svg%3E";
+        
+        wrapper.innerHTML = `
+            <svg class="stage-progress-svg" viewBox="0 0 100 100">
+                <circle class="stage-progress-bg" cx="50" cy="50" r="44"></circle>
+                <circle class="stage-progress-bar" id="stage-bar-${member.id}" cx="50" cy="50" r="44"></circle>
+            </svg>
+            <div class="stage-avatar-img-wrap">
+                <img src="${avtSrc}" id="stage-avt-img-${member.id}" class="stage-avatar-img">
+            </div>
+        `;
+        stageRoot.appendChild(wrapper);
+    }
+
+    function createControlNode(member) {
+        const quickBar = document.getElementById('quick-bar');
+        const wrapper = document.createElement('div'); wrapper.className = 'node-wrapper';
+        wrapper.style.setProperty('--theme-color', member.color);
+
+        const btn = document.createElement('div'); btn.className = 'btn-node'; btn.id = `quick-btn-main-${member.id}`;
+        btn.innerText = `[${member.hotkey}] ${member.enName}`;
+        btn.onclick = (e) => { if(!e.target.classList.contains('node-reset-x')) toggleMain(member.id); };
+
+        const finishBtn = document.createElement('div'); finishBtn.className = 'btn-finish-rect';
+        finishBtn.innerText = `[${member.finishHotkey}] [FINISH]`;
+        finishBtn.onclick = () => toggleFinished(member.id);
+
+        const xBtn = document.createElement('div'); xBtn.className = 'node-reset-x'; xBtn.innerText = '×';
+        xBtn.ondblclick = (e) => { e.stopPropagation(); resetMemberTime(member.id); };
+
+        wrapper.appendChild(btn); 
+        wrapper.appendChild(finishBtn);
+        wrapper.appendChild(xBtn); 
+        quickBar.appendChild(wrapper);
+    }
+
+    function createCardNode(member, index) {
+        const memberList = document.getElementById('member-list');
+        const card = document.createElement('div'); card.id = `card-${member.id}`; card.className = 'member-card';
+        card.style.setProperty('--theme-color', member.color);
+        
+        let cardGap = window.innerWidth <= 600 ? 34 : 38;
+        card.style.top = (index * cardGap) + "px";
+
+        const avtSrc = member.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3C/svg%3E";
+
+        card.innerHTML = `
+            <div class="percent-capsule" id="percent-cap-wrap-${member.id}">
+                <div class="finish-check" id="finish-check-${member.id}">
+                    <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                </div>
+                <span id="percent-cap-${member.id}">00.0%</span>
+            </div>
+            
+            <div class="card-separator"></div>
+            
+            <div class="progress-wrapper">
+                <div class="progress-bg-default"></div>
+                <div class="progress-bg-active"></div>
+                <div class="fill-progress-line" id="line-${member.id}"></div>
+                
+                <div class="card-content-overlay">
+                    <div class="name-box">
+                        <span class="en-name">${member.enName}</span>
+                        <span class="kr-name">${member.krName}</span>
+                        <span class="role-badge" id="role-box-${member.id}" style="color: ${member.color}; border-color: ${member.color};">${member.role}</span>
+                    </div>
+                    
+                    <div class="time-counter">
+                        <div class="rolling-secs">
+                            <div class="digit-slot"><div class="digit-track" id="sec-100-${member.id}"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></div></div>
+                            <div class="digit-slot"><div class="digit-track" id="sec-10-${member.id}"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></div></div>
+                            <div class="digit-slot"><div class="digit-track" id="sec-1-${member.id}"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></div></div>
+                        </div>
+                        <span>.</span>
+                        <span id="ms-box-${member.id}">00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-avatar-floating" id="list-avt-wrap-${member.id}">
+                <img src="${avtSrc}" id="list-avt-img-${member.id}" class="card-avatar-img">
+            </div>
+        `;
+        memberList.appendChild(card);
+        updateRollingNumber(member.id, 0);
+    }
+
+    function toggleMain(id) {
+        let m = members.find(x => x.id === id);
+        if (m && m.isFinished) return; 
+
+        const btn = document.getElementById(`quick-btn-main-${id}`);
+        if (activeMainIds.has(id)) { activeMainIds.delete(id); btn?.classList.remove('active'); } 
+        else { activeMainIds.add(id); btn?.classList.add('active'); }
+        checkActiveStates();
+    }
+
+    function toggleFinished(id) {
+        let m = members.find(x => x.id === id);
+        if (m) {
+            m.isFinished = true;
+            activeMainIds.delete(id);
+            document.getElementById(`quick-btn-main-${id}`)?.classList.remove('active');
+            checkActiveStates();
+        }
+    }
+
+    function toggleGroup(groupNum) {
+        const btn = document.getElementById(`btn-group-${groupNum}`);
+        if (activeGroupIds.has(groupNum)) { activeGroupIds.delete(groupNum); btn?.classList.remove('active'); } 
+        else { activeGroupIds.add(groupNum); btn?.classList.add('active'); }
+        checkActiveStates();
+    }
+
+    function checkActiveStates() {
+        members.forEach(m => {
+            const card = document.getElementById(`card-${m.id}`);
+            const avtWrapper = document.getElementById(`stage-avt-${m.id}`);
+            const finishCheck = document.getElementById(`finish-check-${m.id}`);
+            
+            let inActiveGroup = false;
+            activeGroupIds.forEach(gId => { if(groups[gId] && groups[gId].includes(m.id)) inActiveGroup = true; });
+
+            let isActive = activeMainIds.has(m.id) || inActiveGroup;
+
+            if (finishCheck) {
+                finishCheck.style.display = m.isFinished ? "flex" : "none";
+            }
+
+            if (isActive || m.isFinished) {
+                card?.classList.add('active');
+                avtWrapper?.classList.add('active');
+
+                if (!m.hasShownRole && isActive) {
+                    m.hasShownRole = true;
+                    const roleBox = document.getElementById(`role-box-${m.id}`);
+                    if (roleBox) {
+                        roleBox.classList.add('show');
+                        setTimeout(() => { roleBox.classList.remove('show'); }, 4000); 
+                    }
+                }
+            } else {
+                card?.classList.remove('active');
+                avtWrapper?.classList.remove('active');
+            }
+        });
+    }
+
+    function resetMemberTime(id) {
+        let m = members.find(x => x.id === id);
+        if (m) { 
+            m.ms = 0; m.hasShownRole = false; m.isFinished = false; 
+            updateRollingNumber(id, 0); 
+            updateAllGraphics(); 
+            const roleBox = document.getElementById(`role-box-${m.id}`);
+            if (roleBox) roleBox.classList.remove('show');
+            checkActiveStates();
+        }
+    }
+    
+    function resetAllTimes() {
+        members.forEach(m => { 
+            m.ms = 0; m.hasShownRole = false; m.isFinished = false;
+            updateRollingNumber(m.id, 0); 
+            const roleBox = document.getElementById(`role-box-${m.id}`);
+            if (roleBox) roleBox.classList.remove('show');
+        });
+        activeMainIds.clear(); activeGroupIds.clear();
+        document.querySelectorAll('.btn-node, .btn-group-node, .member-card, .stage-avatar-wrapper').forEach(el => el.classList.remove('active'));
+        updateAllGraphics();
+        checkActiveStates();
+    }
+
+    function updateRollingNumber(memberId, totalMs) {
+        let totalSecs = Math.floor(totalMs / 1000);
+        let d100 = Math.floor(totalSecs / 100) % 10;
+        let d10 = Math.floor(totalSecs / 10) % 10;
+        let d1 = totalSecs % 10;
+
+        let strHun = String(Math.floor((totalMs % 1000) / 10)).padStart(2, '0');
+
+        const t100 = document.getElementById(`sec-100-${memberId}`);
+        const t10 = document.getElementById(`sec-10-${memberId}`);
+        const t1 = document.getElementById(`sec-1-${memberId}`);
+        const msBox = document.getElementById(`ms-box-${memberId}`);
+
+        if (t100) t100.style.transform = `translateY(-${d100 * 10}%)`;
+        if (t10) t10.style.transform = `translateY(-${d10 * 10}%)`;
+        if (t1) t1.style.transform = `translateY(-${d1 * 10}%)`;
+        if (msBox) msBox.textContent = strHun;
+    }
+
+    function updateAllGraphics() {
+        let totalTimeMs = members.reduce((sum, m) => sum + m.ms, 0);
+        let maxMs = (parseFloat(document.getElementById('input-maxsec').value) || 180.0) * 1000; 
+        
+        members.forEach(m => {
+            let totalRatio = Math.min(m.ms / maxMs, 1);
+            
+            const line = document.getElementById('line-' + m.id); 
+            if (line) { line.style.width = (totalRatio * 100) + "%"; line.style.display = totalRatio > 0 ? "block" : "none"; }
+            
+            const stageCircle = document.getElementById('stage-bar-' + m.id);
+            if (stageCircle) {
+                let circumference = 276.46; 
+                let offset = circumference - (totalRatio * circumference);
+                stageCircle.style.strokeDashoffset = offset;
+            }
+
+            let share = totalTimeMs > 0 ? (m.ms / totalTimeMs) * 100 : 0;
+            const pctCapText = document.getElementById(`percent-cap-${m.id}`);
+            if (pctCapText) pctCapText.textContent = share.toFixed(1) + "%";
+        });
+
+        let sortedMembers = [...members].sort((a, b) => {
+            if (b.ms !== a.ms) return b.ms - a.ms; 
+            return a.id - b.id; 
+        });
+
+        let cardGap = window.innerWidth <= 600 ? 34 : 38;
+        sortedMembers.forEach((m, index) => {
+            let card = document.getElementById(`card-${m.id}`);
+            if (card) { card.style.top = (index * cardGap) + "px"; }
+        });
+    }
+
+    function updateLoop(timestamp) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        let deltaTime = timestamp - lastTimestamp; 
+        lastTimestamp = timestamp;
+        
+        let singingMain = new Set(activeMainIds);
+        activeGroupIds.forEach(gId => { if(groups[gId]) groups[gId].forEach(mId => singingMain.add(mId)); });
+
+        if (singingMain.size > 0) {
+            singingMain.forEach(id => { let s = members.find(m => m.id === id); if(s && !s.isFinished) s.ms += deltaTime; });
+            
+            members.forEach(m => { 
+                if (singingMain.has(m.id)) {
+                    updateRollingNumber(m.id, m.ms);
+                }
+            });
+            updateAllGraphics(); 
+        }
+        requestAnimationFrame(updateLoop);
+    }
+    requestAnimationFrame(updateLoop);
+</script>
+</body>
+</html>

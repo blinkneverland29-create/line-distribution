@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TWICE OT9 - Smooth Glowing Edition</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bottom-bg-color: #0b0f19;
+            --bottom-bg-img: none;
+        }
+
+        *, html, body, input, button, select, textarea {
+            font-family: 'Do Hyeon', sans-serif !important;
+            box-sizing: border-box;
+        }    
+        
+        body { margin: 0; padding: 0; background-color: #ffffff; color: #333; overflow: hidden; height: 100vh; width: 100vw; }
+        
+        #app { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+        
+        /* HIỂN THỊ TRỰC QUAN */
+        .display-side {
+            width: 50vw; height: 100vh; position: relative;
+            background-color: var(--bottom-bg-color);
+            background-image: var(--bottom-bg-img);
+            background-size: cover; background-position: center; background-repeat: no-repeat;
+            padding: 25px 30px; overflow: hidden;
+            border-right: 2px solid #cbd5e1;
+        }
+        
+        .output-list { position: relative; width: 100%; height: 100%; }
+
+        /* ĐỔI HẠNG SIÊU MƯỢT */
+        .member-card {
+            position: absolute; left: 0; width: 100%; display: flex; align-items: center; 
+            gap: 12px; z-index: 1; height: 46px; padding: 0; background: transparent;
+            transition: transform 1.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
+            will-change: transform;
+        }
+        .member-card.active { z-index: 10; }
+
+        /* CONTAINER AVATAR */
+        .avatar-container {
+            position: relative; width: 50px; height: 50px; flex-shrink: 0;
+        }
+
+        /* KHUNG AVATAR: THÊM TRANSITION ĐA CHIỀU ĐỂ KHÔNG BỊ KHỰNG GIẬT */
+        .left-square-box {
+            position: absolute; inset: 0; border-radius: 12px;
+            background: #050505;
+            overflow: hidden; 
+            z-index: 5;
+            transform: scale(1);
+            box-shadow: inset 0 0 0 0px transparent, 0 0 0px transparent, 0 0 0px transparent;
+            /* Transition mượt mà cả lúc phóng to (active) lẫn thu nhỏ (inactive) */
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
+            will-change: transform, box-shadow;
+        }
+        
+        /* ẢNH AVATAR BÊN TRONG */
+        .avatar-img-render {
+            position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; object-fit: cover;
+            border-radius: inherit; filter: brightness(0.4) contrast(0.9);
+            transform: scale(1);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.4s ease;
+            will-change: transform, filter;
+        }
+        
+        .avt-overlay {
+            position: absolute; inset: 0; border-radius: inherit; background-color: var(--member-color);
+            opacity: 0; mix-blend-mode: screen; transition: opacity 0.4s ease; pointer-events: none; z-index: 6;
+        }
+
+        .online-dot {
+            position: absolute; bottom: -3px; right: -3px; width: 13px; height: 13px;
+            background-color: color-mix(in srgb, var(--member-color) 25%, #000);
+            border: 2px solid var(--bottom-bg-color); border-radius: 50%; z-index: 30; 
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* KHI ACTIVE: AVATAR GLOW ĐẬM ĐÀ VÀ PHÓNG TO */
+        .member-card.active .left-square-box {
+            transform: scale(1.08); 
+            box-shadow: inset 0 0 0 9px var(--member-color), 
+                        0 0 25px var(--member-color), 
+                        0 0 45px var(--member-glow);
+            z-index: 20;
+        }
+        
+        .member-card.active .avatar-img-render { 
+            filter: brightness(1.15) contrast(1.05); 
+            transform: scale(1.15); 
+        }
+        .member-card.active .avt-overlay { opacity: 0.25; }
+        .member-card.joined-room .online-dot { background-color: #22c55e; box-shadow: 0 0 12px #22c55e; }
+
+        /* THANH TIẾN TRÌNH NỀN */
+        .progress-main-pill {
+            position: relative; flex-grow: 1; max-width: 74%; height: 100%;
+            background-color: #050505;
+            border-radius: 8px; overflow: hidden; transition: background-color 0.3s ease;
+        }
+        
+        /* INACTIVE: LINE MÀU ĐẠI DIỆN TỐI NỀN */
+        .progress-fill-layer {
+            position: absolute; left: 0; top: 0; height: 100%; width: 100%;
+            background-color: color-mix(in srgb, var(--member-color) 65%, #000);
+            border-radius: 8px;
+            transform-origin: left center;
+            transform: scaleX(0);
+            transition: transform 0.1s linear, background-color 0.4s ease, box-shadow 0.4s ease;
+            will-change: transform, background-color, box-shadow;
+        }
+
+        /* ACTIVE: THANH LINE TRẮNG + GLOW ĐẬM MÀU ĐẠI DIỆN */
+        .member-card.active .progress-fill-layer {
+            background-color: #ffffff !important;
+            box-shadow: 0 0 15px #ffffff, 
+                        0 0 30px var(--member-color), 
+                        0 0 50px var(--member-glow);
+        }
+
+        /* KHU VỰC TÊN THÀNH VIÊN VÀ ICON */
+        .text-name-inside {
+            position: absolute; inset: 0; display: flex; align-items: center; padding-left: 12px;
+            font-size: 15px; font-weight: 900; letter-spacing: 0.5px;
+            color: #ffffff;
+            opacity: 0.7; z-index: 5; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            transition: color 0.4s ease, opacity 0.4s ease;
+        }
+        
+        .member-card.active .text-name-inside {
+            color: var(--member-color) !important;
+            opacity: 1;
+            filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8)) brightness(1.2);
+        }
+
+        /* ICON MICRO CHUYỂN ĐỔI GẠCH CHÉO / BẬT */
+        .mic-container {
+            width: 15px; height: 15px; margin-left: 8px; position: relative; display: inline-flex;
+        }
+        .mic-container svg {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+        }
+        .mic-off { opacity: 0.7; color: #ffffff; transform: scale(1); }
+        .mic-on { opacity: 0; color: var(--member-color); transform: scale(0.5); }
+
+        .member-card.active .mic-off { opacity: 0; transform: scale(0.5); }
+        .member-card.active .mic-on { 
+            opacity: 1; transform: scale(1); 
+            filter: drop-shadow(0 0 6px var(--member-glow)); 
+        }
+
+        /* TÊN TIẾNG HÀN TRƯỢT LÊN/XUỐNG SIÊU MƯỢT NHỜ TRANSITION (KHÔNG DÙNG KEYFRAMES NỮA) */
+        .kr-name-span {
+            display: inline-block;
+            margin-left: 4px;
+            opacity: 0;
+            transform: translateY(15px); /* Vị trí trượt xuống khi Inactive */
+            transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+        }
+        
+        .member-card.active .kr-name-span {
+            opacity: 0.85;
+            transform: translateY(0); /* Vị trí chuẩn khi Active */
+        }
+
+        /* THỜI GIAN VÀ BỘ ĐẾM SỐ (KÈM GLOW ĐẬM) */
+        .right-meta-metrics {
+            margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 95px;
+        }
+        
+        .percent-lbl {
+            font-size: 17px; font-weight: bold; color: color-mix(in srgb, var(--member-color) 45%, #181d2a); 
+            opacity: 0.85; line-height: 1; display: flex; align-items: center; height: 18px; overflow: hidden;
+            transition: color 0.3s ease, text-shadow 0.3s ease, opacity 0.3s ease;
+        }
+        
+        /* SỐ PHÁT SÁNG CỰC ĐẬM KHI ACTIVE */
+        .member-card.active .percent-lbl { 
+            color: var(--member-color); 
+            opacity: 1; 
+            text-shadow: 0 0 10px var(--member-color), 0 0 25px var(--member-glow);
+        }
+
+        .roll-slot { display: inline-block; height: 18px; line-height: 18px; width: 10px; text-align: center; position: relative; }
+        .roll-sequence { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        .ms-static-part { display: inline-block; width: 22px; text-align: left; }
+        .roll-digit { height: 18px; line-height: 18px; }
+        .roll-dot { width: 6px; text-align: center; }
+        .join-status-lbl { font-size: 9px; font-weight: bold; color: color-mix(in srgb, var(--member-color) 35%, #2d3748); opacity: 0.6; text-transform: uppercase; margin-top: 2px; }
+        .join-status-lbl.status-joined { color: #eab308; opacity: 1; }
+        .join-status-lbl.status-online { color: #22c55e; opacity: 1; }
+
+        /* BẢNG ĐIỀU KHIỂN */
+        .control-side { width: 50vw; height: 100vh; display: flex; flex-direction: column; background-color: #ffffff; overflow: hidden; }
+        .control-tabs { display: flex; background: #1e293b; }
+        .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; color: #94a3b8; font-weight: bold; font-size: 14px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: #334155; color: #fff; border-bottom: 3px solid #6366f1; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+        .panel-content.active { display: flex; flex-direction: column; gap: 15px; }
+
+        .quick-controllers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; width: 100%; }
+        .node-wrapper { display: flex; flex-direction: column; position: relative; background: #f8fafc; border: 1px solid #e2e8f0; padding: 5px; border-radius: 8px; }
+        .btn-node { padding: 8px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; color: #334155; text-align: center; user-select: none; }
+        .btn-node.active { background: var(--member-color) !important; border-color: var(--member-color) !important; color: #fff !important; font-weight: 900; box-shadow: 0 0 15px var(--member-glow); }
+        .node-reset-x { position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ff4757; color: white; border-radius: 50%; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
+        
+        .group-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .btn-group-node { padding: 10px 6px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer; text-align: center; color: #475569; }
+        .btn-group-node.active { background: #475569; color: #fff; border-color: #475569; }
+        .btn-group-node.editing-mode { border: 2px dashed #6366f1 !important; background: #e0e7ff !important; color: #4338ca !important; }
+
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; color: #475569; text-transform: uppercase; font-weight: bold; }
+        .form-group input { padding: 8px; background: #fff; color: #333; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; }
+        .deck-section-title { font-size: 13px; font-weight: 800; color: #475569; border-left: 4px solid #6366f1; padding-left: 6px; margin: 10px 0 5px 0; }
+        .btn-clear-data { background: #ff4757; color: white; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="display-side" id="bottom-stage">
+        <div class="output-list" id="member-list"></div>
+    </div>
+    
+    <div class="control-side">
+        <div class="control-tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-control')">🕹️ MAIN CONTROLLER</button>
+            <button class="tab-btn" onclick="switchTab('tab-settings')">⚙️ SETTINGS & MEMBERS</button>
+        </div>
+
+        <div id="tab-control" class="panel-content active">
+            <div class="deck-section-title">PRESS TO SING</div>
+            <div class="quick-controllers" id="quick-bar"></div>
+
+            <div class="deck-section-title">👥 GROUP MODE TRIGGER (Hotkeys: 1-9)</div>
+            <div class="group-grid" id="group-bar"></div>
+            
+            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn-node" style="background:#475569; color:#fff;" onclick="triggerLeaveAll()">⌨ PRESS [Z] TO LEAVE VOICE CHAT</button>
+                <button class="btn-clear-data" onclick="resetAllTimes()">↺ RESET ALL TIMERS FOR NEW SONG</button>
+            </div>
+        </div>
+
+        <div id="tab-settings" class="panel-content">
+            <div class="form-group">
+                <label>Background Color / Canvas Image</label>
+                <input type="color" id="bottom-bg-picker" value="#0b0f19" onchange="changeBottomBg(this.value)">
+                <input type="file" accept="image/*" onchange="changeBottomBgImage(this)" style="font-size:12px; margin-top:4px;">
+                <button onclick="clearBottomBgImage()" style="background:#ef4444; color:white; border:none; padding:4px; border-radius:4px; font-size:12px; margin-top:2px; cursor:pointer;">Remove Background Image</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Max Song Duration (Seconds)</label>
+                <input type="number" step="0.1" id="input-maxsec" value="180.0">
+            </div>
+            
+            <hr style="border:none; border-top:1px solid #e2e8f0; width:100%;">
+            <div class="deck-section-title">Upload Avatars, Colors & Glows</div>
+            <div id="avatar-uploaders-container" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let members = [];
+    let defaultMembers = [
+        {"id":1,"enName":"NAYEON","krName":"나연","hotkey":"Q","ms":0,"avatar":"","color":"#ff99bb","glow":"#ffccd4"},
+        {"id":2,"enName":"JEONGYEON","krName":"정연","hotkey":"W","ms":0,"avatar":"","color":"#a3d9c9","glow":"#e0f2f1"},
+        {"id":3,"enName":"MOMO","krName":"모모","hotkey":"E","ms":0,"avatar":"","color":"#ffb5c5","glow":"#ffe4e1"},
+        {"id":4,"enName":"SANA","krName":"사나","hotkey":"R","ms":0,"avatar":"","color":"#99ccff","glow":"#e6f2ff"},
+        {"id":5,"enName":"JIHYO","krName":"지효","hotkey":"T","ms":0,"avatar":"","color":"#ffcc66","glow":"#fff0d4"},
+        {"id":6,"enName":"MINA","krName":"미나","hotkey":"Y","ms":0,"avatar":"","color":"#70dbdb","glow":"#e0f7f7"},
+        {"id":7,"enName":"DAHYUN","krName":"다현","hotkey":"U","ms":0,"avatar":"","color":"#ffffff","glow":"#f3e5f5"},
+        {"id":8,"enName":"CHAEYOUNG","krName":"채영","hotkey":"I","ms":0,"avatar":"","color":"#ff6666","glow":"#ffccd4"},
+        {"id":9,"enName":"TZUYU","krName":"쯔위","hotkey":"O","ms":0,"avatar":"","color":"#3399ff","glow":"#b3d7ff"}
+    ];
+
+    let groups = { "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [] };
+    let activeMainIds = new Set();
+    let activeGroupIds = new Set();
+    let joinedRoomIds = new Set();
+    let currentSelectedGroup = "1";
+    let lastTimestamp = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadData();
+        initUI();
+    });
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function loadData() {
+        if (localStorage.getItem('twice-ot9-v7-mic')) {
+            try { 
+                let saved = JSON.parse(localStorage.getItem('twice-ot9-v7-mic')); 
+                if (saved.length === 9) { 
+                    members = saved.map((m, i) => ({...defaultMembers[i], ...m}));
+                } else { members = JSON.parse(JSON.stringify(defaultMembers)); }
+            } catch(e) { members = JSON.parse(JSON.stringify(defaultMembers)); }
+        } else { members = JSON.parse(JSON.stringify(defaultMembers)); }
+        
+        members.forEach(m => { m.joinedDuration = 0; });
+        if (localStorage.getItem('twice-ot9-v7-groups-mic')) { 
+            try { groups = JSON.parse(localStorage.getItem('twice-ot9-v7-groups-mic')); } catch(e) {} 
+        }
+        
+        let bBg = localStorage.getItem('twice-bottom-bg') || '#0b0f19';
+        document.getElementById('bottom-bg-picker').value = bBg;
+        document.documentElement.style.setProperty('--bottom-bg-color', bBg);
+    }
+
+    function saveData() {
+        localStorage.setItem('twice-ot9-v7-mic', JSON.stringify(members));
+        localStorage.setItem('twice-ot9-v7-groups-mic', JSON.stringify(groups));
+    }
+
+    function changeBottomBg(color) { document.documentElement.style.setProperty('--bottom-bg-color', color); localStorage.setItem('twice-bottom-bg', color); }
+    function changeBottomBgImage(input) {
+        if (input.files[0]) {
+            const r = new FileReader(); r.onload = (e) => {
+                document.documentElement.style.setProperty('--bottom-bg-img', `url(${e.target.result})`);
+            }; r.readAsDataURL(input.files[0]);
+        }
+    }
+    function clearBottomBgImage() { document.documentElement.style.setProperty('--bottom-bg-img', 'none'); }
+
+    function initUI() {
+        document.getElementById('avatar-uploaders-container').innerHTML = '';
+        document.getElementById('member-list').innerHTML = '';
+        document.getElementById('group-bar').innerHTML = '';
+        document.getElementById('quick-bar').innerHTML = '';
+
+        buildAvatarUploaders();
+        members.forEach((m, index) => {
+            m.ms = m.ms || 0;
+            createCardNode(m, index);
+            createControlNode(m);
+        });
+
+        const groupBar = document.getElementById('group-bar');
+        for(let i = 1; i <= 9; i++) {
+            const gBtn = document.createElement('div'); gBtn.className = 'btn-group-node'; gBtn.id = `btn-group-${i}`;
+            updateGroupButtonLabel(i);
+            gBtn.onclick = () => { currentSelectedGroup = i.toString(); toggleGroup(currentSelectedGroup); updateGroupStyles(); }; 
+            groupBar.appendChild(gBtn);
+        }
+        updateGroupStyles(); updateAllGraphics(); checkActiveStates();
+    }
+
+    function updateGroupStyles() {
+        for(let i = 1; i <= 9; i++) {
+            const btn = document.getElementById(`btn-group-${i}`);
+            if(btn) { if(i.toString() === currentSelectedGroup) btn.classList.add('editing-mode'); else btn.classList.remove('editing-mode'); }
+        }
+    }
+
+    function updateGroupButtonLabel(gNum) {
+        const gBtn = document.getElementById(`btn-group-${gNum}`);
+        if (!gBtn) return;
+        let activeNames = [];
+        if (groups[gNum]) {
+            groups[gNum].forEach(mId => {
+                let found = members.find(x => x.id === Number(mId));
+                if (found) activeNames.push(found.enName.slice(0, 4));
+            });
+        }
+        gBtn.innerText = activeNames.length > 0 ? `[${gNum}] ${activeNames.join('+')}` : `[${gNum}] Group ${gNum}`;
+    }
+
+    function makeRollDigitSequence() {
+        let h = '';
+        for(let i=0; i<=9; i++) { h += `<div class="roll-digit">${i}</div>`; }
+        return h;
+    }
+
+    function createCardNode(member, index) {
+        const root = document.getElementById('member-list');
+        const card = document.createElement('div'); card.id = `card-${member.id}`; card.className = 'member-card';
+        card.style.setProperty('--member-color', member.color || '#ff6584');
+        card.style.setProperty('--member-glow', member.glow || '#000000');
+        const avtSrc = member.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231e293b'/%3E%3C/svg%3E";
+        
+        let digitsHtml = makeRollDigitSequence();
+
+        card.innerHTML = `
+            <div class="avatar-container">
+                <div class="left-square-box">
+                    <img src="${avtSrc}" class="avatar-img-render" id="card-circle-avt-${member.id}">
+                    <div class="avt-overlay"></div>
+                </div>
+                <div class="online-dot" id="dot-${member.id}"></div>
+            </div>
+            <div class="progress-main-pill">
+                <div class="progress-fill-layer" id="line-${member.id}"></div>
+                <div class="text-name-inside" id="name-cap-${member.id}">
+                    ${member.enName}
+                    <div class="mic-container">
+                        <svg class="mic-off" viewBox="0 0 24 24"><path fill="currentColor" d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02 3.28L13 12.32V11h-2v-.68L8.82 8.13C8.42 8.94 8.2 9.9 8.2 11H6.5c0-1.42.36-2.75.98-3.9l-4-4L4.9 1.68l1.41-1.41 16 16-1.41 1.42zM12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v1.18l3 3V14z"/></svg>
+                        <svg class="mic-on" viewBox="0 0 24 24"><path fill="currentColor" d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+                    </div>
+                    <span class="kr-name-span">${member.krName}</span>
+                </div>
+            </div>
+            <div class="right-meta-metrics">
+                <div class="percent-lbl" id="counter-${member.id}">
+                    <div class="roll-slot"><div class="roll-sequence" id="roll-${member.id}-0">${digitsHtml}</div></div>
+                    <div class="roll-slot"><div class="roll-sequence" id="roll-${member.id}-1">${digitsHtml}</div></div>
+                    <div class="roll-slot"><div class="roll-sequence" id="roll-${member.id}-2">${digitsHtml}</div></div>
+                    <div class="roll-dot">.</div>
+                    <div class="ms-static-part" id="ms-static-${member.id}">00</div>
+                </div>
+                <div class="join-status-lbl" id="join-status-${member.id}">Not in Room</div>
+            </div>
+        `;
+        root.appendChild(card);
+    }
+
+    function createControlNode(member) {
+        const quickBar = document.getElementById('quick-bar');
+        const wrapper = document.createElement('div'); wrapper.className = 'node-wrapper';
+        const btn = document.createElement('div'); btn.className = 'btn-node'; btn.id = `quick-btn-main-${member.id}`; btn.innerText = `[${member.hotkey}] ${member.enName}`;
+        btn.style.setProperty('--member-color', member.color || '#ff6584');
+        btn.style.setProperty('--member-glow', member.glow || '#000000');
+        
+        btn.onclick = () => toggleMain(member.id);
+        btn.oncontextmenu = (e) => { e.preventDefault(); handleMemberRightClick(member.id); };
+
+        const xBtn = document.createElement('div'); xBtn.className = 'node-reset-x'; xBtn.innerText = '×';
+        xBtn.onclick = (e) => { e.stopPropagation(); resetMemberTime(member.id); };
+        wrapper.appendChild(btn); wrapper.appendChild(xBtn); quickBar.appendChild(wrapper);
+    }
+
+    function handleMemberRightClick(mId) {
+        mId = Number(mId); if(!groups[currentSelectedGroup]) groups[currentSelectedGroup] = [];
+        if (groups[currentSelectedGroup].map(Number).includes(mId)) {
+            groups[currentSelectedGroup] = groups[currentSelectedGroup].filter(id => Number(id) !== mId);
+        } else {
+            groups[currentSelectedGroup].push(mId);
+        }
+        saveData(); updateGroupButtonLabel(currentSelectedGroup); checkActiveStates();
+    }
+
+    function toggleMain(id) {
+        id = Number(id);
+        let currentSinging = new Set(activeMainIds);
+        activeGroupIds.forEach(gId => { if(groups[gId]) groups[gId].forEach(mId => currentSinging.add(Number(mId))); });
+
+        if (currentSinging.size === members.length) {
+            activeGroupIds.clear(); 
+            activeMainIds.clear();
+            activeMainIds.add(id);
+        } else {
+            if (activeMainIds.has(id)) { activeMainIds.delete(id); } else { activeMainIds.add(id); }
+        }
+        checkActiveStates();
+    }
+
+    function toggleGroup(groupNum) {
+        if (activeGroupIds.has(groupNum)) { activeGroupIds.delete(groupNum); } else { activeGroupIds.add(groupNum); }
+        checkActiveStates();
+    }
+
+    function triggerLeaveAll() {
+        activeMainIds.clear(); activeGroupIds.clear(); joinedRoomIds.clear();
+        checkActiveStates();
+    }
+
+    function checkActiveStates() {
+        let singingNow = new Set(activeMainIds);
+        activeGroupIds.forEach(gId => {
+            if(groups[gId]) groups[gId].forEach(mId => singingNow.add(Number(mId)));
+        });
+
+        singingNow.forEach(id => joinedRoomIds.add(id));
+
+        members.forEach(m => {
+            let isActiveSinging = singingNow.has(m.id);
+            let hasJoinedRoom = joinedRoomIds.has(m.id);
+            
+            const card = document.getElementById(`card-${m.id}`);
+            const qBtn = document.getElementById(`quick-btn-main-${m.id}`);
+
+            if (isActiveSinging) { 
+                card?.classList.add('active'); 
+                qBtn?.classList.add('active');
+            } 
+            else { 
+                card?.classList.remove('active'); 
+                qBtn?.classList.remove('active'); 
+            }
+
+            if (hasJoinedRoom) card?.classList.add('joined-room'); 
+            else card?.classList.remove('joined-room');
+        });
+
+        document.querySelectorAll('.btn-group-node').forEach(b => {
+            let gId = b.id.replace('btn-group-', '');
+            if(activeGroupIds.has(gId)) b.classList.add('active'); else b.classList.remove('active');
+        });
+    }
+
+    function updateRollingCounter(memberId, totalMs) {
+        let seconds = totalMs / 1000;
+        let parts = seconds.toFixed(2).split('.');
+        let intPart = parts[0].padStart(3, '0');
+        let msPart = parts[1];
+
+        const msEl = document.getElementById(`ms-static-${memberId}`);
+        if (msEl) msEl.textContent = msPart;
+
+        for (let i = 0; i < 3; i++) {
+            const seqEl = document.getElementById(`roll-${memberId}-${i}`);
+            if (seqEl) {
+                let digitValue = parseInt(intPart[i]) || 0;
+                let translateY = -(digitValue * 18);
+                seqEl.style.transform = `translateY(${translateY}px)`;
+            }
+        }
+    }
+
+    function updateAllGraphics() {
+        let maxMs = (parseFloat(document.getElementById('input-maxsec').value) || 180.0) * 1000;
+        let highestMs = 0;
+        members.forEach(m => { if (m.ms > highestMs) highestMs = m.ms; });
+
+        if (highestMs > maxMs) { maxMs = highestMs; }
+
+        members.forEach(m => {
+            const line = document.getElementById(`line-${m.id}`);
+            if (line) {
+                let ratio = Math.min(m.ms / maxMs, 1);
+                line.style.transform = `scaleX(${ratio})`;
+            }
+            updateRollingCounter(m.id, m.ms);
+        });
+
+        let sorted = [...members].sort((a, b) => b.ms - a.ms);
+        let cardHeightWithGap = 54; 
+        sorted.forEach((m, rankIndex) => {
+            const card = document.getElementById(`card-${m.id}`);
+            if (card) { card.style.transform = `translateY(${rankIndex * cardHeightWithGap}px)`; }
+        });
+    }
+
+    function resetMemberTime(id) {
+        id = Number(id); let m = members.find(x => x.id === id);
+        if (m) { m.ms = 0; activeMainIds.delete(id); updateAllGraphics(); checkActiveStates(); saveData(); }
+    }
+
+    function resetAllTimes() {
+        members.forEach(m => { m.ms = 0; });
+        activeMainIds.clear(); activeGroupIds.clear(); joinedRoomIds.clear(); updateAllGraphics(); checkActiveStates(); saveData();
+    }
+
+    function buildAvatarUploaders() {
+        document.getElementById('avatar-uploaders-container').innerHTML = members.map(m => `
+            <div style="display:flex; flex-direction:column; background:#f1f5f9; padding:10px; border-radius:6px; margin-bottom:6px; gap:6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:13px; font-weight:bold; color:#1e293b">${m.enName} (${m.krName})</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <input type="file" accept="image/*" style="font-size:11px; width:100%;" onchange="handleFile(${m.id}, this)">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                        <input type="color" value="${m.color || '#ff6584'}" onchange="handleColorChange(${m.id}, this.value)" style="width:45%; height:24px; cursor:pointer;">
+                        <input type="color" value="${m.glow || '#000000'}" onchange="handleGlowChange(${m.id}, this.value)" style="width:45%; height:24px; cursor:pointer;">
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function handleColorChange(id, newColor) {
+        id = Number(id); let m = members.find(x => x.id === id);
+        if (m) {
+            m.color = newColor; saveData();
+            document.getElementById(`card-${id}`)?.style.setProperty('--member-color', newColor);
+            document.getElementById(`quick-btn-main-${id}`)?.style.setProperty('--member-color', newColor);
+            checkActiveStates();
+        }
+    }
+
+    function handleGlowChange(id, newGlowColor) {
+        id = Number(id); let m = members.find(x => x.id === id);
+        if (m) {
+            m.glow = newGlowColor; saveData();
+            document.getElementById(`card-${id}`)?.style.setProperty('--member-glow', newGlowColor);
+            document.getElementById(`quick-btn-main-${id}`)?.style.setProperty('--member-glow', newGlowColor);
+            checkActiveStates();
+        }
+    }
+    
+    function handleFile(id, input) {
+        id = Number(id);
+        if (input.files[0]) {
+            const r = new FileReader(); r.onload = (e) => {
+                let m = members.find(x => x.id === id); 
+                if (m) { 
+                    m.avatar = e.target.result; 
+                    let cardAvt = document.getElementById(`card-circle-avt-${id}`);
+                    if(cardAvt) cardAvt.src = m.avatar;
+                    saveData(); 
+                }
+            }; r.readAsDataURL(input.files[0]);
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        const key = e.key.toUpperCase();
+        if (key === 'Z') { triggerLeaveAll(); return; }
+        if (key >= '1' && key <= '9') { currentSelectedGroup = key; toggleGroup(key); updateGroupStyles(); return; }
+        let mm = members.find(m => m.hotkey === key); if (mm) { toggleMain(mm.id); return; }
+    });
+
+    function updateLoop(ts) {
+        if (!lastTimestamp) lastTimestamp = ts; let delta = ts - lastTimestamp; lastTimestamp = ts;
+        if (delta > 100) delta = 16; 
+
+        let singing = new Set(activeMainIds);
+        activeGroupIds.forEach(gId => { if(groups[gId]) groups[gId].forEach(mId => singing.add(Number(mId))); });
+        
+        let isAllSinging = (singing.size === members.length && members.length > 0);
+
+        if (singing.size > 0 && !isAllSinging) { 
+            singing.forEach(id => { let s = members.find(m => m.id === id); if(s) s.ms += delta; }); 
+        }
+        
+        members.forEach(m => {
+            let isJoined = joinedRoomIds.has(m.id);
+            let statusLbl = document.getElementById(`join-status-${m.id}`);
+            if (isJoined) {
+                m.joinedDuration = (m.joinedDuration || 0) + delta;
+                if (statusLbl) {
+                    if (m.joinedDuration >= 3000) { 
+                        statusLbl.innerText = "Online"; statusLbl.className = "join-status-lbl status-online";
+                    } else {
+                        statusLbl.innerText = "Joined Room"; statusLbl.className = "join-status-lbl status-joined";
+                    }
+                }
+            } else {
+                m.joinedDuration = 0; 
+                if (statusLbl) { statusLbl.innerText = "Not in Room"; statusLbl.className = "join-status-lbl"; }
+            }
+        });
+
+        updateAllGraphics();
+        requestAnimationFrame(updateLoop);
+    }
+    requestAnimationFrame(updateLoop);
+</script>
+</body>
+</html>
